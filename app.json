@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FitDietApp",
+    "name": "FitDiet",
     "slug": "FitDietApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,21 +10,48 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#6200EE"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fitdiet.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "FitDiet needs access to your health data to track your fitness progress and provide personalized recommendations.",
+        "NSHealthUpdateUsageDescription": "FitDiet needs permission to write workout data to Health.",
+        "NSCameraUsageDescription": "FitDiet needs camera access to scan food barcodes."
+      }
     },
     "android": {
+      "package": "com.fitdiet.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#6200EE"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow FitDiet to access your camera to scan food barcodes."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
     }
   }
 }
