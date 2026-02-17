@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
+import { View, ScrollView, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import {
   Text,
   Surface,
-  SegmentedButtons,
   Chip,
   ActivityIndicator,
-  Card,
-  Button,
   IconButton,
 } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '../store/userStore';
 import { foodService } from '../services/foodService';
 import { FoodCard } from '../components';
@@ -98,55 +96,99 @@ export function SuggestionsScreen() {
 
   const remainingCalories = dailySummary?.caloriesRemaining || user?.dailyCalorieTarget || 2000;
 
+  const mealTypeConfig = [
+    { type: 'breakfast' as MealType, icon: '🌅', label: 'Breakfast' },
+    { type: 'lunch' as MealType, icon: '☀️', label: 'Lunch' },
+    { type: 'dinner' as MealType, icon: '🌙', label: 'Dinner' },
+    { type: 'snack' as MealType, icon: '🍪', label: 'Snack' },
+  ];
+
   return (
     <View style={styles.container}>
-      {/* Header with remaining calories */}
-      <Surface style={styles.header} elevation={0}>
-        <Text style={styles.headerTitle}>Smart Suggestions</Text>
-        <View style={styles.caloriesChip}>
-          <Text style={styles.caloriesLabel}>Calories left:</Text>
-          <Text style={styles.caloriesValue}>{remainingCalories} kcal</Text>
+      {/* Header */}
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Smart Suggestions</Text>
+            <Text style={styles.headerSubtitle}>Personalized for you</Text>
+          </View>
+          <Surface style={styles.caloriesCard} elevation={2}>
+            <Text style={styles.caloriesLabel}>Remaining</Text>
+            <Text style={styles.caloriesValue}>{remainingCalories}</Text>
+            <Text style={styles.caloriesUnit}>kcal</Text>
+          </Surface>
         </View>
-      </Surface>
 
-      {/* Tab Selector */}
-      <Surface style={styles.tabContainer} elevation={0}>
-        <SegmentedButtons
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as SuggestionTab)}
-          buttons={[
-            { value: 'meals', label: 'Meal Ideas', icon: 'food-apple' },
-            { value: 'alternatives', label: 'Healthier Swaps', icon: 'swap-horizontal' },
-          ]}
-        />
-      </Surface>
+        {/* Tab Selector */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
+            onPress={() => setActiveTab('meals')}
+          >
+            <IconButton
+              icon="food-apple"
+              iconColor={activeTab === 'meals' ? '#667eea' : '#fff'}
+              size={20}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'meals' && styles.tabLabelActive]}>
+              Meal Ideas
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'alternatives' && styles.tabActive]}
+            onPress={() => setActiveTab('alternatives')}
+          >
+            <IconButton
+              icon="swap-horizontal"
+              iconColor={activeTab === 'alternatives' ? '#667eea' : '#fff'}
+              size={20}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'alternatives' && styles.tabLabelActive]}>
+              Healthier Swaps
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       {activeTab === 'meals' ? (
         <>
           {/* Meal Type Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipContainer}
-            contentContainerStyle={styles.chipContent}
-          >
-            {(['breakfast', 'lunch', 'dinner', 'snack'] as MealType[]).map((type) => (
-              <Chip
-                key={type}
-                selected={selectedMealType === type}
-                onPress={() => setSelectedMealType(type)}
-                style={styles.chip}
-                mode={selectedMealType === type ? 'flat' : 'outlined'}
-              >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </Chip>
-            ))}
-          </ScrollView>
+          <View style={styles.mealTypeContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mealTypeScroll}
+            >
+              {mealTypeConfig.map((meal) => (
+                <TouchableOpacity
+                  key={meal.type}
+                  onPress={() => setSelectedMealType(meal.type)}
+                  style={[
+                    styles.mealTypeChip,
+                    selectedMealType === meal.type && styles.mealTypeChipSelected,
+                  ]}
+                >
+                  <Text style={styles.mealTypeIcon}>{meal.icon}</Text>
+                  <Text style={[
+                    styles.mealTypeLabel,
+                    selectedMealType === meal.type && styles.mealTypeLabelSelected,
+                  ]}>
+                    {meal.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* Meal Suggestions */}
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" />
+              <ActivityIndicator size="large" color="#667eea" />
               <Text style={styles.loadingText}>Finding the best options for you...</Text>
             </View>
           ) : (
@@ -163,8 +205,10 @@ export function SuggestionsScreen() {
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <IconButton icon="food-off" size={48} iconColor="#999" />
-                  <Text style={styles.emptyText}>No suggestions available</Text>
+                  <View style={styles.emptyIconContainer}>
+                    <Text style={styles.emptyIcon}>🍽️</Text>
+                  </View>
+                  <Text style={styles.emptyTitle}>No suggestions available</Text>
                   <Text style={styles.emptySubtext}>
                     Try searching for foods in the Diet Log
                   </Text>
@@ -176,49 +220,61 @@ export function SuggestionsScreen() {
       ) : (
         <>
           {/* Today's Meals for alternatives */}
-          <View style={styles.mealsListContainer}>
-            <Text style={styles.sectionTitle}>Select a meal to find alternatives:</Text>
+          <Surface style={styles.mealsSection} elevation={0}>
+            <Text style={styles.sectionTitle}>Select a meal to find alternatives</Text>
             {todaysMeals.length === 0 ? (
-              <Card style={styles.emptyCard}>
-                <Card.Content>
-                  <Text style={styles.emptyText}>No meals logged today</Text>
-                  <Text style={styles.emptySubtext}>
-                    Log some meals first to get healthier alternatives
-                  </Text>
-                </Card.Content>
-              </Card>
+              <View style={styles.noMealsCard}>
+                <Text style={styles.noMealsIcon}>🥗</Text>
+                <Text style={styles.noMealsText}>No meals logged today</Text>
+                <Text style={styles.noMealsSubtext}>
+                  Log some meals first to get healthier alternatives
+                </Text>
+              </View>
             ) : (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.mealChips}
+                contentContainerStyle={styles.mealChipsScroll}
               >
                 {todaysMeals.map((meal) => (
-                  <Chip
+                  <TouchableOpacity
                     key={meal.id}
-                    selected={selectedMeal?.id === meal.id}
                     onPress={() => loadAlternatives(meal)}
-                    style={styles.mealChip}
-                    mode={selectedMeal?.id === meal.id ? 'flat' : 'outlined'}
+                    style={[
+                      styles.mealChip,
+                      selectedMeal?.id === meal.id && styles.mealChipSelected,
+                    ]}
                   >
-                    {meal.foodName.length > 20
-                      ? meal.foodName.substring(0, 20) + '...'
-                      : meal.foodName}
-                  </Chip>
+                    <Text style={styles.mealChipIcon}>
+                      {meal.mealType === 'breakfast' ? '🌅' :
+                       meal.mealType === 'lunch' ? '☀️' :
+                       meal.mealType === 'dinner' ? '🌙' : '🍪'}
+                    </Text>
+                    <View style={styles.mealChipContent}>
+                      <Text style={[
+                        styles.mealChipName,
+                        selectedMeal?.id === meal.id && styles.mealChipNameSelected,
+                      ]} numberOfLines={1}>
+                        {meal.foodName}
+                      </Text>
+                      <Text style={styles.mealChipCalories}>{meal.calories} kcal</Text>
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             )}
-          </View>
+          </Surface>
 
           {/* Alternative Suggestions */}
           {selectedMeal && (
             <View style={styles.alternativesContainer}>
-              <Text style={styles.sectionTitle}>
-                Healthier alternatives to {selectedMeal.foodName}:
-              </Text>
+              <View style={styles.alternativesHeader}>
+                <Text style={styles.alternativesTitle}>Healthier alternatives to</Text>
+                <Text style={styles.alternativesFor}>{selectedMeal.foodName}</Text>
+              </View>
               {isLoading ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" />
+                  <ActivityIndicator size="large" color="#667eea" />
                 </View>
               ) : (
                 <FlatList
@@ -234,14 +290,28 @@ export function SuggestionsScreen() {
                   contentContainerStyle={styles.listContent}
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                      <Text style={styles.emptyText}>No alternatives found</Text>
+                      <View style={styles.emptyIconContainer}>
+                        <Text style={styles.emptyIcon}>✨</Text>
+                      </View>
+                      <Text style={styles.emptyTitle}>Great choice!</Text>
                       <Text style={styles.emptySubtext}>
-                        This seems to be a healthy choice already!
+                        This seems to be a healthy option already
                       </Text>
                     </View>
                   }
                 />
               )}
+            </View>
+          )}
+
+          {!selectedMeal && todaysMeals.length > 0 && (
+            <View style={styles.selectPrompt}>
+              <View style={styles.selectPromptIcon}>
+                <IconButton icon="gesture-tap" iconColor="#667eea" size={32} />
+              </View>
+              <Text style={styles.selectPromptText}>
+                Tap on a meal above to see healthier alternatives
+              </Text>
             </View>
           )}
         </>
@@ -253,98 +323,257 @@ export function SuggestionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   header: {
-    padding: 16,
-    paddingBottom: 8,
-    backgroundColor: '#6200EE',
+    paddingTop: 16,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
   },
-  caloriesChip: {
-    flexDirection: 'row',
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  caloriesCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
     alignItems: 'center',
-    marginTop: 8,
+    minWidth: 80,
   },
   caloriesLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    marginRight: 8,
+    fontSize: 10,
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   caloriesValue: {
-    color: '#fff',
+    fontSize: 24,
     fontWeight: 'bold',
-    fontSize: 18,
+    color: '#667eea',
+  },
+  caloriesUnit: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: -2,
   },
   tabContainer: {
-    padding: 12,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 16,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  tabActive: {
     backgroundColor: '#fff',
+  },
+  tabLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: -4,
+  },
+  tabLabelActive: {
+    color: '#667eea',
+  },
+  mealTypeContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#f0f0f0',
   },
-  chipContainer: {
-    backgroundColor: '#fff',
-    maxHeight: 60,
+  mealTypeScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  chipContent: {
-    padding: 12,
-    gap: 8,
+  mealTypeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
   },
-  chip: {
+  mealTypeChipSelected: {
+    backgroundColor: '#667eea',
+  },
+  mealTypeIcon: {
+    fontSize: 18,
     marginRight: 8,
+  },
+  mealTypeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  mealTypeLabelSelected: {
+    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 60,
   },
   loadingText: {
     marginTop: 16,
     color: '#666',
+    fontSize: 15,
+    textAlign: 'center',
   },
   listContent: {
-    paddingVertical: 8,
-    paddingBottom: 20,
+    paddingVertical: 12,
+    paddingBottom: 24,
   },
   emptyContainer: {
-    padding: 40,
+    padding: 60,
     alignItems: 'center',
   },
-  emptyCard: {
-    margin: 16,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+  emptyIcon: {
+    fontSize: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a2e',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    color: '#666',
     textAlign: 'center',
   },
-  mealsListContainer: {
-    padding: 16,
+  mealsSection: {
     backgroundColor: '#fff',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   sectionTitle: {
     fontSize: 14,
     color: '#666',
     marginBottom: 12,
   },
-  mealChips: {
-    gap: 8,
+  noMealsCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  noMealsIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  noMealsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a2e',
+  },
+  noMealsSubtext: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  mealChipsScroll: {
+    gap: 12,
   },
   mealChip: {
-    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 16,
+    padding: 12,
+    minWidth: 160,
+  },
+  mealChipSelected: {
+    backgroundColor: '#667eea15',
+    borderWidth: 2,
+    borderColor: '#667eea',
+  },
+  mealChipIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  mealChipContent: {
+    flex: 1,
+  },
+  mealChipName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a2e',
+  },
+  mealChipNameSelected: {
+    color: '#667eea',
+  },
+  mealChipCalories: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   alternativesContainer: {
     flex: 1,
-    paddingTop: 16,
+  },
+  alternativesHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  alternativesTitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  alternativesFor: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a2e',
+    marginTop: 4,
+  },
+  selectPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  selectPromptIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#667eea15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  selectPromptText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
   },
 });

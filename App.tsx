@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Provider as PaperProvider, MD3LightTheme } from 'react-native-paper';
+import { Provider as PaperProvider, MD3LightTheme, ActivityIndicator, Text } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -17,13 +18,10 @@ import {
   AuthScreen,
   OnboardingScreen,
 } from './src/screens';
-import { RootStackParamList, MainTabParamList } from './src/types';
-import { ActivityIndicator, View } from 'react-native';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
-// Custom theme
 const theme = {
   ...MD3LightTheme,
   colors: {
@@ -34,103 +32,69 @@ const theme = {
   },
 };
 
-// Main tab navigator
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: string;
-
-          switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'DietLog':
-              iconName = focused ? 'food-apple' : 'food-apple-outline';
-              break;
-            case 'Fitness':
-              iconName = focused ? 'run' : 'run';
-              break;
-            case 'Suggestions':
-              iconName = focused ? 'lightbulb' : 'lightbulb-outline';
-              break;
-            case 'Profile':
-              iconName = focused ? 'account' : 'account-outline';
-              break;
-            default:
-              iconName = 'circle';
-          }
-
+          let iconName = 'circle';
+          if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
+          else if (route.name === 'DietLog') iconName = focused ? 'food-apple' : 'food-apple-outline';
+          else if (route.name === 'Fitness') iconName = 'run';
+          else if (route.name === 'Suggestions') iconName = focused ? 'lightbulb' : 'lightbulb-outline';
+          else if (route.name === 'Profile') iconName = focused ? 'account' : 'account-outline';
           return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#6200EE',
         tabBarInactiveTintColor: 'gray',
-        headerStyle: {
-          backgroundColor: '#6200EE',
-        },
+        headerStyle: { backgroundColor: '#6200EE' },
         headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
       })}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ title: 'Dashboard' }}
-      />
-      <Tab.Screen
-        name="DietLog"
-        component={DietLogScreen}
-        options={{ title: 'Log Meal' }}
-      />
-      <Tab.Screen
-        name="Fitness"
-        component={FitnessScreen}
-        options={{ title: 'Fitness' }}
-      />
-      <Tab.Screen
-        name="Suggestions"
-        component={SuggestionsScreen}
-        options={{ title: 'Suggestions' }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ title: 'Profile' }}
-      />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Dashboard', headerShown: false }} />
+      <Tab.Screen name="DietLog" component={DietLogScreen} options={{ title: 'Log Meal', headerShown: false }} />
+      <Tab.Screen name="Fitness" component={FitnessScreen} options={{ title: 'Fitness', headerShown: false }} />
+      <Tab.Screen name="Suggestions" component={SuggestionsScreen} options={{ title: 'Suggestions', headerShown: false }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile', headerShown: false }} />
     </Tab.Navigator>
   );
 }
 
-// Loading screen
 function LoadingScreen() {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
       <ActivityIndicator size="large" color="#6200EE" />
+      <Text style={{ marginTop: 16 }}>Loading...</Text>
     </View>
   );
 }
 
-// Root navigator
 function RootNavigator() {
-  const { isAuthenticated, isLoading, user, checkSession } = useUserStore();
+  const [isReady, setIsReady] = useState(false);
+  const store = useUserStore();
 
   useEffect(() => {
-    checkSession();
+    const init = async () => {
+      try {
+        await store.checkSession();
+      } catch (e) {
+        console.log('Session check error:', e);
+      }
+      setIsReady(true);
+    };
+    init();
   }, []);
 
-  if (isLoading) {
+  if (!isReady) {
     return <LoadingScreen />;
   }
 
-  // Check if user needs onboarding (no profile data)
-  const needsOnboarding = isAuthenticated && user && (!user.age || !user.height || !user.weight);
+  const isAuth = store.isAuthenticated === true;
+  const needsOnboarding = isAuth && store.user && (!store.user.age || !store.user.height || !store.user.weight);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {!isAuthenticated ? (
+      {!isAuth ? (
         <Stack.Screen name="Auth" component={AuthScreen} />
       ) : needsOnboarding ? (
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />

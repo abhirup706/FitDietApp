@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import {
   Text,
   Surface,
   Button,
-  Card,
   IconButton,
   Divider,
   ActivityIndicator,
   Snackbar,
 } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '../store/userStore';
 import { healthService } from '../services/healthService';
-import { StatCard, ProgressRing } from '../components';
+import { ProgressRing } from '../components';
 import { calculateProgress } from '../utils/calculations';
 
 export function FitnessScreen() {
@@ -75,180 +75,272 @@ export function FitnessScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Connecting to health services...</Text>
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          style={styles.loadingGradient}
+        >
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.loadingText}>Connecting to health services...</Text>
+        </LinearGradient>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Health Source Info */}
-        <Surface style={styles.sourceCard} elevation={1}>
-          <View style={styles.sourceHeader}>
-            <IconButton
-              icon={Platform.OS === 'ios' ? 'apple' : 'google-fit'}
-              size={24}
-              iconColor="#6200EE"
-            />
-            <View style={styles.sourceInfo}>
-              <Text style={styles.sourceTitle}>
-                {Platform.OS === 'ios' ? 'Apple Health' : 'Google Fit'}
-              </Text>
-              <Text style={styles.sourceStatus}>
-                {healthPermissions.length > 0 ? 'Connected' : 'Not connected'}
-              </Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerTitle}>Fitness</Text>
+              <Text style={styles.headerSubtitle}>Track your activity</Text>
             </View>
-            <Button
-              mode="contained"
+            <TouchableOpacity
               onPress={handleSyncHealth}
-              loading={isSyncing}
               disabled={isSyncing}
-              compact
+              style={styles.syncButton}
             >
-              Sync
-            </Button>
+              <View style={styles.syncButtonInner}>
+                {isSyncing ? (
+                  <ActivityIndicator size="small" color="#667eea" />
+                ) : (
+                  <IconButton icon="sync" iconColor="#667eea" size={24} />
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
-          {todaysFitness && (
-            <Text style={styles.lastSync}>
-              Last synced: {new Date(todaysFitness.date).toLocaleDateString()}
-            </Text>
-          )}
-        </Surface>
+
+          {/* Health Source */}
+          <Surface style={styles.sourceCard} elevation={4}>
+            <View style={styles.sourceRow}>
+              <View style={styles.sourceIconContainer}>
+                <IconButton
+                  icon={Platform.OS === 'ios' ? 'apple' : 'google'}
+                  size={28}
+                  iconColor="#fff"
+                />
+              </View>
+              <View style={styles.sourceInfo}>
+                <Text style={styles.sourceTitle}>
+                  {Platform.OS === 'ios' ? 'Apple Health' : 'Google Fit'}
+                </Text>
+                <Text style={[
+                  styles.sourceStatus,
+                  { color: healthPermissions.length > 0 ? '#4CAF50' : '#ff6b6b' }
+                ]}>
+                  {healthPermissions.length > 0 ? 'Connected' : 'Not connected'}
+                </Text>
+              </View>
+              {todaysFitness && (
+                <Text style={styles.lastSync}>
+                  Updated {new Date(todaysFitness.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Text>
+              )}
+            </View>
+          </Surface>
+        </LinearGradient>
 
         {/* Progress Rings */}
         <View style={styles.ringsContainer}>
-          <View style={styles.ringItem}>
+          <Surface style={styles.ringCard} elevation={2}>
             <ProgressRing
               progress={stepsProgress}
-              size={130}
-              strokeWidth={14}
+              size={120}
+              strokeWidth={12}
               color="#4CAF50"
               value={steps.toLocaleString()}
-              label={`/ ${(stepsGoal / 1000).toFixed(0)}k steps`}
+              label="steps"
             />
-          </View>
-          <View style={styles.ringItem}>
+            <View style={styles.ringGoal}>
+              <Text style={styles.ringGoalText}>Goal: {(stepsGoal / 1000)}k</Text>
+            </View>
+          </Surface>
+          <Surface style={styles.ringCard} elevation={2}>
             <ProgressRing
               progress={activeProgress}
-              size={130}
-              strokeWidth={14}
+              size={120}
+              strokeWidth={12}
               color="#2196F3"
               value={`${activeMinutes}`}
-              label={`/ ${activeGoal} min`}
+              label="active min"
             />
-          </View>
+            <View style={styles.ringGoal}>
+              <Text style={styles.ringGoalText}>Goal: {activeGoal} min</Text>
+            </View>
+          </Surface>
         </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Calories Burned"
-            value={caloriesBurned}
-            subtitle="kcal"
-            icon="fire"
-            color="#FF5722"
-          />
-          <StatCard
-            title="Avg Heart Rate"
-            value={todaysFitness?.heartRateAvg || '--'}
-            subtitle="bpm"
-            icon="heart-pulse"
-            color="#F44336"
-          />
-        </View>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <Surface style={styles.statCard} elevation={2}>
+            <LinearGradient
+              colors={['#ff6b6b', '#ff8e8e']}
+              style={styles.statIconBg}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <IconButton icon="fire" iconColor="#fff" size={24} />
+            </LinearGradient>
+            <Text style={styles.statValue}>{caloriesBurned}</Text>
+            <Text style={styles.statLabel}>Calories Burned</Text>
+          </Surface>
 
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Sleep"
-            value={todaysFitness?.sleepHours?.toFixed(1) || '--'}
-            subtitle="hours"
-            icon="sleep"
-            color="#9C27B0"
-          />
-          <StatCard
-            title="Distance"
-            value={((steps * 0.0008).toFixed(1))}
-            subtitle="km (est.)"
-            icon="map-marker-distance"
-            color="#00BCD4"
-          />
+          <Surface style={styles.statCard} elevation={2}>
+            <LinearGradient
+              colors={['#e91e63', '#f48fb1']}
+              style={styles.statIconBg}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <IconButton icon="heart-pulse" iconColor="#fff" size={24} />
+            </LinearGradient>
+            <Text style={styles.statValue}>{todaysFitness?.heartRateAvg || '--'}</Text>
+            <Text style={styles.statLabel}>Avg Heart Rate</Text>
+          </Surface>
+
+          <Surface style={styles.statCard} elevation={2}>
+            <LinearGradient
+              colors={['#9c27b0', '#ce93d8']}
+              style={styles.statIconBg}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <IconButton icon="sleep" iconColor="#fff" size={24} />
+            </LinearGradient>
+            <Text style={styles.statValue}>{todaysFitness?.sleepHours?.toFixed(1) || '--'}</Text>
+            <Text style={styles.statLabel}>Hours Sleep</Text>
+          </Surface>
+
+          <Surface style={styles.statCard} elevation={2}>
+            <LinearGradient
+              colors={['#00bcd4', '#80deea']}
+              style={styles.statIconBg}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <IconButton icon="map-marker-distance" iconColor="#fff" size={24} />
+            </LinearGradient>
+            <Text style={styles.statValue}>{(steps * 0.0008).toFixed(1)}</Text>
+            <Text style={styles.statLabel}>Km (est.)</Text>
+          </Surface>
         </View>
 
         {/* Activity Breakdown */}
-        <Card style={styles.breakdownCard}>
-          <Card.Title title="Today's Activity" />
-          <Card.Content>
+        <Surface style={styles.breakdownCard} elevation={2}>
+          <Text style={styles.cardTitle}>Today's Activity</Text>
+          <View style={styles.breakdownContent}>
             <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Morning (6am-12pm)</Text>
+              <View style={styles.breakdownIconContainer}>
+                <Text style={styles.breakdownIcon}>🌅</Text>
+              </View>
+              <View style={styles.breakdownInfo}>
+                <Text style={styles.breakdownLabel}>Morning</Text>
+                <Text style={styles.breakdownTime}>6am - 12pm</Text>
+              </View>
               <Text style={styles.breakdownValue}>
                 {Math.floor(steps * 0.35).toLocaleString()} steps
               </Text>
             </View>
             <Divider style={styles.divider} />
             <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Afternoon (12pm-6pm)</Text>
+              <View style={styles.breakdownIconContainer}>
+                <Text style={styles.breakdownIcon}>☀️</Text>
+              </View>
+              <View style={styles.breakdownInfo}>
+                <Text style={styles.breakdownLabel}>Afternoon</Text>
+                <Text style={styles.breakdownTime}>12pm - 6pm</Text>
+              </View>
               <Text style={styles.breakdownValue}>
                 {Math.floor(steps * 0.45).toLocaleString()} steps
               </Text>
             </View>
             <Divider style={styles.divider} />
             <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Evening (6pm-12am)</Text>
+              <View style={styles.breakdownIconContainer}>
+                <Text style={styles.breakdownIcon}>🌙</Text>
+              </View>
+              <View style={styles.breakdownInfo}>
+                <Text style={styles.breakdownLabel}>Evening</Text>
+                <Text style={styles.breakdownTime}>6pm - 12am</Text>
+              </View>
               <Text style={styles.breakdownValue}>
                 {Math.floor(steps * 0.2).toLocaleString()} steps
               </Text>
             </View>
-          </Card.Content>
-        </Card>
+          </View>
+        </Surface>
 
         {/* Weekly Summary */}
-        <Card style={styles.weeklyCard}>
-          <Card.Title title="This Week" />
-          <Card.Content>
-            <View style={styles.weekDays}>
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => {
-                const isToday = index === new Date().getDay() - 1;
-                const isFuture = index > new Date().getDay() - 1;
-                return (
-                  <View key={index} style={styles.weekDay}>
-                    <Text style={[styles.dayLabel, isToday && styles.todayLabel]}>
-                      {day}
-                    </Text>
-                    <View
-                      style={[
-                        styles.dayIndicator,
-                        isToday && styles.todayIndicator,
-                        isFuture && styles.futureIndicator,
-                      ]}
-                    />
-                  </View>
-                );
-              })}
+        <Surface style={styles.weeklyCard} elevation={2}>
+          <Text style={styles.cardTitle}>This Week</Text>
+          <View style={styles.weekDays}>
+            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => {
+              const isToday = index === (new Date().getDay() + 6) % 7;
+              const isFuture = index > (new Date().getDay() + 6) % 7;
+              const completed = !isFuture && Math.random() > 0.3;
+              return (
+                <View key={index} style={styles.weekDay}>
+                  <Text style={[styles.dayLabel, isToday && styles.todayLabel]}>
+                    {day}
+                  </Text>
+                  <LinearGradient
+                    colors={
+                      isToday
+                        ? ['#667eea', '#764ba2']
+                        : isFuture
+                        ? ['#e0e0e0', '#e0e0e0']
+                        : completed
+                        ? ['#4CAF50', '#81c784']
+                        : ['#ffcdd2', '#ffcdd2']
+                    }
+                    style={styles.dayIndicator}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    {isToday && (
+                      <IconButton icon="check" iconColor="#fff" size={16} />
+                    )}
+                    {!isToday && !isFuture && completed && (
+                      <IconButton icon="check" iconColor="#fff" size={16} />
+                    )}
+                  </LinearGradient>
+                </View>
+              );
+            })}
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.weekStats}>
+            <View style={styles.weekStat}>
+              <Text style={styles.weekStatValue}>45,230</Text>
+              <Text style={styles.weekStatLabel}>Total Steps</Text>
             </View>
-            <View style={styles.weekStats}>
-              <View style={styles.weekStat}>
-                <Text style={styles.weekStatValue}>45,230</Text>
-                <Text style={styles.weekStatLabel}>Total Steps</Text>
-              </View>
-              <View style={styles.weekStat}>
-                <Text style={styles.weekStatValue}>1,890</Text>
-                <Text style={styles.weekStatLabel}>Calories Burned</Text>
-              </View>
-              <View style={styles.weekStat}>
-                <Text style={styles.weekStatValue}>3h 45m</Text>
-                <Text style={styles.weekStatLabel}>Active Time</Text>
-              </View>
+            <View style={styles.weekStatDivider} />
+            <View style={styles.weekStat}>
+              <Text style={styles.weekStatValue}>1,890</Text>
+              <Text style={styles.weekStatLabel}>Cal Burned</Text>
             </View>
-          </Card.Content>
-        </Card>
+            <View style={styles.weekStatDivider} />
+            <View style={styles.weekStat}>
+              <Text style={styles.weekStatValue}>3h 45m</Text>
+              <Text style={styles.weekStatLabel}>Active</Text>
+            </View>
+          </View>
+        </Surface>
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={3000}
+        style={styles.snackbar}
       >
         {snackbarMessage}
       </Snackbar>
@@ -259,79 +351,204 @@ export function FitnessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContent: {
-    padding: 16,
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
+    flex: 1,
+  },
+  loadingGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 16,
-    color: '#666',
+    color: '#fff',
+    fontSize: 16,
+  },
+  header: {
+    paddingTop: 16,
+    paddingBottom: 80,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  syncButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  syncButtonInner: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sourceCard: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    marginBottom: 16,
   },
-  sourceHeader: {
+  sourceRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sourceIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   sourceInfo: {
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 12,
   },
   sourceTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
   sourceStatus: {
-    fontSize: 12,
-    color: '#4CAF50',
+    fontSize: 13,
+    marginTop: 2,
   },
   lastSync: {
     fontSize: 12,
-    color: '#999',
-    marginTop: 8,
-    marginLeft: 48,
+    color: 'rgba(255,255,255,0.7)',
   },
   ringsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 16,
+    marginTop: -50,
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  ringItem: {
+  ringCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
     alignItems: 'center',
   },
-  statsRow: {
+  ringGoal: {
+    marginTop: 12,
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  ringGoalText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  statsGrid: {
     flexDirection: 'row',
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    padding: 16,
+    gap: 12,
+  },
+  statCard: {
+    width: '47%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+  },
+  statIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
   },
   breakdownCard: {
-    marginVertical: 8,
+    margin: 16,
+    marginTop: 0,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
   },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a2e',
+    marginBottom: 16,
+  },
+  breakdownContent: {},
   breakdownItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  breakdownIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  breakdownIcon: {
+    fontSize: 20,
+  },
+  breakdownInfo: {
+    flex: 1,
+    marginLeft: 12,
   },
   breakdownLabel: {
-    color: '#666',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a2e',
+  },
+  breakdownTime: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   breakdownValue: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#667eea',
   },
   divider: {
-    marginVertical: 4,
+    backgroundColor: '#f0f0f0',
   },
   weeklyCard: {
-    marginVertical: 8,
+    margin: 16,
+    marginTop: 0,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
   },
   weekDays: {
     flexDirection: 'row',
@@ -345,41 +562,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 8,
+    fontWeight: '500',
   },
   todayLabel: {
-    color: '#6200EE',
+    color: '#667eea',
     fontWeight: 'bold',
   },
   dayIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4CAF50',
-  },
-  todayIndicator: {
-    backgroundColor: '#6200EE',
-  },
-  futureIndicator: {
-    backgroundColor: '#E0E0E0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   weekStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
   },
   weekStat: {
     alignItems: 'center',
+    flex: 1,
+  },
+  weekStatDivider: {
+    width: 1,
+    backgroundColor: '#f0f0f0',
   },
   weekStatValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1a1a2e',
   },
   weekStatLabel: {
     fontSize: 11,
     color: '#666',
     marginTop: 4,
+  },
+  bottomSpacer: {
+    height: 20,
+  },
+  snackbar: {
+    backgroundColor: '#1a1a2e',
   },
 });

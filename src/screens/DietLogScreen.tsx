@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, FlatList } from 'react-native';
+import { View, ScrollView, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import {
   Text,
   Searchbar,
-  SegmentedButtons,
   IconButton,
   Surface,
   ActivityIndicator,
@@ -13,11 +12,19 @@ import {
   Button,
   TextInput,
 } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useUserStore } from '../store/userStore';
 import { foodService } from '../services/foodService';
 import { FoodCard } from '../components';
 import { FoodItem, MealType } from '../types';
+
+const mealTypes: { type: MealType; icon: string; label: string; gradient: [string, string] }[] = [
+  { type: 'breakfast', icon: '🌅', label: 'Breakfast', gradient: ['#ff9a56', '#ff6b6b'] },
+  { type: 'lunch', icon: '☀️', label: 'Lunch', gradient: ['#56ab2f', '#a8e063'] },
+  { type: 'dinner', icon: '🌙', label: 'Dinner', gradient: ['#667eea', '#764ba2'] },
+  { type: 'snack', icon: '🍪', label: 'Snack', gradient: ['#f093fb', '#f5576c'] },
+];
 
 export function DietLogScreen({ navigation }: any) {
   const { addMeal } = useUserStore();
@@ -127,43 +134,85 @@ export function DietLogScreen({ navigation }: any) {
     [mealType]
   );
 
+  const selectedMealConfig = mealTypes.find(m => m.type === mealType)!;
+
   return (
     <View style={styles.container}>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={selectedMealConfig.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <Text style={styles.headerTitle}>Log Meal</Text>
+        <Text style={styles.headerSubtitle}>What did you eat?</Text>
+      </LinearGradient>
+
       {/* Meal Type Selector */}
-      <Surface style={styles.mealTypeContainer} elevation={0}>
-        <SegmentedButtons
-          value={mealType}
-          onValueChange={(value) => setMealType(value as MealType)}
-          buttons={[
-            { value: 'breakfast', label: 'Breakfast', icon: 'weather-sunny' },
-            { value: 'lunch', label: 'Lunch', icon: 'food' },
-            { value: 'dinner', label: 'Dinner', icon: 'food-variant' },
-            { value: 'snack', label: 'Snack', icon: 'cookie' },
-          ]}
-          style={styles.segmentedButtons}
-        />
-      </Surface>
+      <View style={styles.mealTypeContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.mealTypeScroll}
+        >
+          {mealTypes.map((meal) => (
+            <TouchableOpacity
+              key={meal.type}
+              onPress={() => setMealType(meal.type)}
+              style={[
+                styles.mealTypeButton,
+                mealType === meal.type && styles.mealTypeButtonSelected,
+              ]}
+            >
+              <LinearGradient
+                colors={mealType === meal.type ? meal.gradient : ['#f5f5f5', '#f5f5f5']}
+                style={styles.mealTypeGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.mealTypeIcon}>{meal.icon}</Text>
+                <Text style={[
+                  styles.mealTypeLabel,
+                  mealType === meal.type && styles.mealTypeLabelSelected,
+                ]}>
+                  {meal.label}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Searchbar
-          placeholder="Search foods..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchbar}
-        />
-        <IconButton
-          icon="barcode-scan"
-          mode="contained"
-          onPress={openScanner}
-          style={styles.scanButton}
-        />
+        <View style={styles.searchWrapper}>
+          <Searchbar
+            placeholder="Search foods..."
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={styles.searchbar}
+            inputStyle={styles.searchInput}
+            iconColor="#667eea"
+          />
+        </View>
+        <TouchableOpacity onPress={openScanner} style={styles.scanButton}>
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            style={styles.scanButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <IconButton icon="barcode-scan" iconColor="#fff" size={24} />
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>Searching...</Text>
         </View>
       ) : searchQuery.length >= 2 ? (
         // Search Results
@@ -174,6 +223,7 @@ export function DietLogScreen({ navigation }: any) {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔍</Text>
               <Text style={styles.emptyText}>No foods found</Text>
               <Text style={styles.emptySubtext}>Try a different search term</Text>
             </View>
@@ -182,7 +232,10 @@ export function DietLogScreen({ navigation }: any) {
       ) : (
         // Quick Add Foods
         <ScrollView contentContainerStyle={styles.listContent}>
-          <Text style={styles.sectionTitle}>Quick Add</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Quick Add</Text>
+            <Text style={styles.sectionSubtitle}>Popular choices</Text>
+          </View>
           {quickAddFoods.map((food) => (
             <FoodCard key={food.id} food={food} onAdd={handleAddFood} />
           ))}
@@ -197,7 +250,14 @@ export function DietLogScreen({ navigation }: any) {
           contentContainerStyle={styles.scannerModal}
         >
           <View style={styles.scannerContainer}>
-            <Text style={styles.scannerTitle}>Scan Barcode</Text>
+            <View style={styles.scannerHeader}>
+              <Text style={styles.scannerTitle}>Scan Barcode</Text>
+              <IconButton
+                icon="close"
+                onPress={() => setShowScanner(false)}
+                iconColor="#666"
+              />
+            </View>
             <View style={styles.cameraContainer}>
               <CameraView
                 style={styles.camera}
@@ -207,10 +267,11 @@ export function DietLogScreen({ navigation }: any) {
                 }}
                 onBarcodeScanned={handleBarcodeScanned}
               />
+              <View style={styles.scanOverlay}>
+                <View style={styles.scanCorner} />
+              </View>
             </View>
-            <Button mode="outlined" onPress={() => setShowScanner(false)}>
-              Cancel
-            </Button>
+            <Text style={styles.scanHint}>Position barcode within the frame</Text>
           </View>
         </Modal>
       </Portal>
@@ -224,22 +285,48 @@ export function DietLogScreen({ navigation }: any) {
         >
           {selectedFood && (
             <View>
-              <Text style={styles.modalTitle}>Add {selectedFood.name}</Text>
+              <View style={styles.servingHeader}>
+                <Text style={styles.modalTitle}>{selectedFood.name}</Text>
+                <IconButton
+                  icon="close"
+                  onPress={() => setShowServingModal(false)}
+                  iconColor="#666"
+                  size={20}
+                />
+              </View>
               <Text style={styles.servingInfo}>
-                Serving: {selectedFood.servingSize}{selectedFood.servingUnit}
+                1 serving = {selectedFood.servingSize}{selectedFood.servingUnit}
               </Text>
 
-              <View style={styles.nutritionPreview}>
-                <Text style={styles.nutritionPreviewTitle}>Per serving:</Text>
-                <Text>
-                  Calories: {Math.round(selectedFood.nutrition.calories * (parseFloat(servingMultiplier) || 1))} kcal
-                </Text>
-                <Text>
-                  P: {Math.round(selectedFood.nutrition.protein * (parseFloat(servingMultiplier) || 1))}g |
-                  C: {Math.round(selectedFood.nutrition.carbs * (parseFloat(servingMultiplier) || 1))}g |
-                  F: {Math.round(selectedFood.nutrition.fat * (parseFloat(servingMultiplier) || 1))}g
-                </Text>
-              </View>
+              <Surface style={styles.nutritionPreview} elevation={0}>
+                <Text style={styles.nutritionPreviewTitle}>Nutrition per serving</Text>
+                <View style={styles.nutritionGrid}>
+                  <View style={styles.nutritionItem}>
+                    <Text style={styles.nutritionValue}>
+                      {Math.round(selectedFood.nutrition.calories * (parseFloat(servingMultiplier) || 1))}
+                    </Text>
+                    <Text style={styles.nutritionLabel}>kcal</Text>
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <Text style={[styles.nutritionValue, { color: '#e91e63' }]}>
+                      {Math.round(selectedFood.nutrition.protein * (parseFloat(servingMultiplier) || 1))}g
+                    </Text>
+                    <Text style={styles.nutritionLabel}>Protein</Text>
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <Text style={[styles.nutritionValue, { color: '#667eea' }]}>
+                      {Math.round(selectedFood.nutrition.carbs * (parseFloat(servingMultiplier) || 1))}g
+                    </Text>
+                    <Text style={styles.nutritionLabel}>Carbs</Text>
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <Text style={[styles.nutritionValue, { color: '#ff9800' }]}>
+                      {Math.round(selectedFood.nutrition.fat * (parseFloat(servingMultiplier) || 1))}g
+                    </Text>
+                    <Text style={styles.nutritionLabel}>Fat</Text>
+                  </View>
+                </View>
+              </Surface>
 
               <TextInput
                 label="Number of servings"
@@ -248,13 +335,25 @@ export function DietLogScreen({ navigation }: any) {
                 keyboardType="decimal-pad"
                 mode="outlined"
                 style={styles.servingInput}
+                outlineColor="#e0e0e0"
+                activeOutlineColor="#667eea"
               />
 
               <View style={styles.modalButtons}>
-                <Button mode="outlined" onPress={() => setShowServingModal(false)}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setShowServingModal(false)}
+                  style={styles.cancelButton}
+                  textColor="#666"
+                >
                   Cancel
                 </Button>
-                <Button mode="contained" onPress={confirmAddFood}>
+                <Button
+                  mode="contained"
+                  onPress={confirmAddFood}
+                  style={styles.addButton}
+                  buttonColor="#667eea"
+                >
                   Add to {mealType}
                 </Button>
               </View>
@@ -268,6 +367,7 @@ export function DietLogScreen({ navigation }: any) {
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={3000}
+        style={styles.snackbar}
       >
         {snackbarMessage}
       </Snackbar>
@@ -278,56 +378,136 @@ export function DietLogScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
   },
   mealTypeContainer: {
-    padding: 12,
-    backgroundColor: '#fff',
+    marginTop: -12,
+    marginBottom: 8,
   },
-  segmentedButtons: {
-    marginHorizontal: 4,
+  mealTypeScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  mealTypeButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  mealTypeButtonSelected: {
+    elevation: 4,
+  },
+  mealTypeGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  mealTypeIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  mealTypeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  mealTypeLabelSelected: {
+    color: '#fff',
   },
   searchContainer: {
     flexDirection: 'row',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    gap: 12,
+  },
+  searchWrapper: {
+    flex: 1,
   },
   searchbar: {
-    flex: 1,
-    marginRight: 8,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    elevation: 2,
+  },
+  searchInput: {
+    fontSize: 16,
   },
   scanButton: {
-    margin: 0,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 3,
+  },
+  scanButtonGradient: {
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listContent: {
     paddingVertical: 8,
+    paddingBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginHorizontal: 16,
-    marginVertical: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a2e',
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 16,
+  },
   emptyContainer: {
-    padding: 40,
+    padding: 60,
     alignItems: 'center',
   },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a2e',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
     marginTop: 8,
   },
   scannerModal: {
@@ -335,35 +515,67 @@ const styles = StyleSheet.create({
   },
   scannerContainer: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingLeft: 20,
+    paddingRight: 8,
+    paddingTop: 8,
   },
   scannerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 16,
+    color: '#1a1a2e',
   },
   cameraContainer: {
-    width: 280,
     height: 280,
-    borderRadius: 12,
+    margin: 16,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 16,
+    position: 'relative',
   },
   camera: {
     flex: 1,
   },
+  scanOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanCorner: {
+    width: 200,
+    height: 200,
+    borderWidth: 3,
+    borderColor: '#667eea',
+    borderRadius: 16,
+  },
+  scanHint: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+    paddingBottom: 20,
+  },
   servingModal: {
     backgroundColor: '#fff',
     margin: 20,
+    borderRadius: 24,
     padding: 20,
-    borderRadius: 16,
+  },
+  servingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#1a1a2e',
+    flex: 1,
   },
   servingInfo: {
     fontSize: 14,
@@ -371,21 +583,50 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   nutritionPreview: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 16,
     marginBottom: 16,
   },
   nutritionPreviewTitle: {
     fontWeight: '600',
-    marginBottom: 4,
+    color: '#1a1a2e',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  nutritionGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  nutritionItem: {
+    alignItems: 'center',
+  },
+  nutritionValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+  },
+  nutritionLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
   },
   servingInput: {
     marginBottom: 16,
+    backgroundColor: '#fff',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    borderColor: '#e0e0e0',
+  },
+  addButton: {
+    flex: 2,
+  },
+  snackbar: {
+    backgroundColor: '#1a1a2e',
   },
 });
