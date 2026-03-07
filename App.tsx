@@ -13,6 +13,7 @@ import {
   HomeScreen,
   DietLogScreen,
   FitnessScreen,
+  GroceryScreen,
   SuggestionsScreen,
   ProfileScreen,
   AuthScreen,
@@ -41,6 +42,7 @@ function MainTabs() {
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
           else if (route.name === 'DietLog') iconName = focused ? 'food-apple' : 'food-apple-outline';
           else if (route.name === 'Fitness') iconName = 'run';
+          else if (route.name === 'Grocery') iconName = focused ? 'cart' : 'cart-outline';
           else if (route.name === 'Suggestions') iconName = focused ? 'lightbulb' : 'lightbulb-outline';
           else if (route.name === 'Profile') iconName = focused ? 'account' : 'account-outline';
           return <Icon name={iconName} size={size} color={color} />;
@@ -54,6 +56,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Dashboard', headerShown: false }} />
       <Tab.Screen name="DietLog" component={DietLogScreen} options={{ title: 'Log Meal', headerShown: false }} />
       <Tab.Screen name="Fitness" component={FitnessScreen} options={{ title: 'Fitness', headerShown: false }} />
+      <Tab.Screen name="Grocery" component={GroceryScreen} options={{ title: 'Grocery', headerShown: false }} />
       <Tab.Screen name="Suggestions" component={SuggestionsScreen} options={{ title: 'Suggestions', headerShown: false }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile', headerShown: false }} />
     </Tab.Navigator>

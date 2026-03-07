@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, DietaryPreferences, Meal, FitnessData, DailySummary } from '../types';
+import { User, DietaryPreferences, Meal, FitnessData, DailySummary, GroceryItem, NewGroceryItem, GroceryCategory } from '../types';
 import { supabase, db } from '../services/supabaseClient';
 import { calculateDailyCalorieTarget } from '../utils/calculations';
 
@@ -16,6 +16,10 @@ interface UserState {
   todaysMeals: Meal[];
   todaysFitness: FitnessData | null;
   dailySummary: DailySummary | null;
+
+  // Grocery data
+  groceryItems: GroceryItem[];
+  availableIngredients: string[];
 
   // Actions
   setUser: (user: User | null) => void;
@@ -43,6 +47,14 @@ interface UserState {
   syncFitnessData: (data: Omit<FitnessData, 'id' | 'userId'>) => Promise<{ error: any }>;
   loadTodaysFitness: () => Promise<void>;
 
+  // Grocery actions
+  loadGroceryItems: () => Promise<void>;
+  addGroceryItem: (item: NewGroceryItem) => Promise<{ error: any }>;
+  removeGroceryItem: (itemId: string) => Promise<{ error: any }>;
+  toggleItemPurchased: (itemId: string) => Promise<{ error: any }>;
+  clearPurchasedItems: () => Promise<{ error: any }>;
+  updateAvailableIngredients: () => void;
+
   // Summary
   refreshDailySummary: () => void;
 }
@@ -58,6 +70,8 @@ export const useUserStore = create<UserState>()(
       todaysMeals: [],
       todaysFitness: null,
       dailySummary: null,
+      groceryItems: [],
+      availableIngredients: [],
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       setSession: (session) => set({ session }),
@@ -170,6 +184,8 @@ export const useUserStore = create<UserState>()(
           todaysMeals: [],
           todaysFitness: null,
           dailySummary: null,
+          groceryItems: [],
+          availableIngredients: [],
         });
       },
 
@@ -202,6 +218,7 @@ export const useUserStore = create<UserState>()(
               // Load today's data
               get().loadTodaysMeals();
               get().loadTodaysFitness();
+              get().loadGroceryItems();
             }
           }
         } catch (error) {
@@ -397,6 +414,163 @@ export const useUserStore = create<UserState>()(
           set({ todaysFitness: fitness });
           get().refreshDailySummary();
         }
+      },
+
+      // Load grocery items
+      loadGroceryItems: async () => {
+        const { user } = get();
+        if (!user) return;
+
+        const { data, error } = await db.getGroceryItems(user.id);
+
+        if (error) {
+          console.error('Failed to load grocery items:', error);
+          // Keep existing local items if database fails
+          return;
+        }
+
+        if (data) {
+          const items: GroceryItem[] = data.map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            category: item.category as GroceryCategory,
+            purchased: item.purchased,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at,
+          }));
+          set({ groceryItems: items });
+          get().updateAvailableIngredients();
+        }
+      },
+
+      // Add a grocery item
+      addGroceryItem: async (itemData) => {
+        const { user, groceryItems } = get();
+        if (!user) return { error: new Error('Not authenticated') };
+
+        // Create a temporary ID for optimistic update
+        const tempId = `temp-${Date.now()}`;
+        const now = new Date().toISOString();
+
+        // Optimistically add to local state first
+        const newItem: GroceryItem = {
+          id: tempId,
+          userId: user.id,
+          name: itemData.name,
+          quantity: itemData.quantity,
+          unit: itemData.unit,
+          category: itemData.category,
+          purchased: itemData.purchased,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set({ groceryItems: [newItem, ...groceryItems] });
+
+        // Try to persist to database
+        const item = {
+          user_id: user.id,
+          name: itemData.name,
+          quantity: itemData.quantity,
+          unit: itemData.unit,
+          category: itemData.category,
+          purchased: itemData.purchased,
+        };
+
+        const { data, error } = await db.addGroceryItem(item);
+
+        if (error) {
+          console.error('Failed to save grocery item to database:', error);
+          // Keep the item in local state even if DB fails (for offline/testing)
+          // In production, you might want to show an error or retry
+        } else if (data) {
+          // Update with real ID from database
+          set({
+            groceryItems: get().groceryItems.map((i) =>
+              i.id === tempId
+                ? { ...i, id: data.id, createdAt: data.created_at, updatedAt: data.updated_at }
+                : i
+            ),
+          });
+        }
+
+        return { error };
+      },
+
+      // Remove a grocery item
+      removeGroceryItem: async (itemId) => {
+        const { groceryItems } = get();
+
+        // Optimistically remove from local state
+        set({ groceryItems: groceryItems.filter((item) => item.id !== itemId) });
+        get().updateAvailableIngredients();
+
+        // Skip database call for temp items (not yet synced)
+        if (itemId.startsWith('temp-')) {
+          return { error: null };
+        }
+
+        const { error } = await db.deleteGroceryItem(itemId);
+        if (error) {
+          console.error('Failed to delete grocery item from database:', error);
+        }
+
+        return { error };
+      },
+
+      // Toggle item purchased status
+      toggleItemPurchased: async (itemId) => {
+        const { groceryItems } = get();
+        const item = groceryItems.find((i) => i.id === itemId);
+        if (!item) return { error: new Error('Item not found') };
+
+        // Optimistically update local state
+        set({
+          groceryItems: groceryItems.map((i) =>
+            i.id === itemId ? { ...i, purchased: !i.purchased } : i
+          ),
+        });
+        get().updateAvailableIngredients();
+
+        // Skip database call for temp items
+        if (itemId.startsWith('temp-')) {
+          return { error: null };
+        }
+
+        const { error } = await db.toggleGroceryItemPurchased(itemId, !item.purchased);
+        if (error) {
+          console.error('Failed to update grocery item in database:', error);
+        }
+
+        return { error };
+      },
+
+      // Clear all purchased items
+      clearPurchasedItems: async () => {
+        const { user, groceryItems } = get();
+        if (!user) return { error: new Error('Not authenticated') };
+
+        // Optimistically clear from local state
+        set({ groceryItems: groceryItems.filter((item) => !item.purchased) });
+        get().updateAvailableIngredients();
+
+        const { error } = await db.clearPurchasedItems(user.id);
+        if (error) {
+          console.error('Failed to clear purchased items from database:', error);
+        }
+
+        return { error };
+      },
+
+      // Update available ingredients based on purchased items
+      updateAvailableIngredients: () => {
+        const { groceryItems } = get();
+        const ingredients = groceryItems
+          .filter((item) => item.purchased)
+          .map((item) => item.name.toLowerCase());
+        set({ availableIngredients: ingredients });
       },
 
       // Refresh daily summary

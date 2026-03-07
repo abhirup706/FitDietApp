@@ -3,33 +3,35 @@ import { View, ScrollView, StyleSheet, FlatList, TouchableOpacity } from 'react-
 import {
   Text,
   Surface,
-  Chip,
   ActivityIndicator,
-  IconButton,
 } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useUserStore } from '../store/userStore';
 import { foodService } from '../services/foodService';
 import { FoodCard } from '../components';
 import { FoodSuggestion, MealType, Meal } from '../types';
 
-type SuggestionTab = 'alternatives' | 'meals';
+type SuggestionTab = 'alternatives' | 'meals' | 'groceries';
 
 export function SuggestionsScreen() {
-  const { user, todaysMeals, dailySummary, addMeal } = useUserStore();
+  const { user, todaysMeals, dailySummary, addMeal, availableIngredients } = useUserStore();
 
   const [activeTab, setActiveTab] = useState<SuggestionTab>('meals');
   const [selectedMealType, setSelectedMealType] = useState<MealType>('lunch');
   const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
   const [alternatives, setAlternatives] = useState<FoodSuggestion[]>([]);
+  const [grocerySuggestions, setGrocerySuggestions] = useState<FoodSuggestion[]>([]);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'meals') {
       loadMealSuggestions();
+    } else if (activeTab === 'groceries') {
+      loadGrocerySuggestions();
     }
-  }, [activeTab, selectedMealType, user?.dietaryPreferences]);
+  }, [activeTab, selectedMealType, user?.dietaryPreferences, availableIngredients]);
 
   const loadMealSuggestions = async () => {
     if (!user?.dietaryPreferences) return;
@@ -42,6 +44,23 @@ export function SuggestionsScreen() {
       selectedMealType
     );
     setSuggestions(results);
+    setIsLoading(false);
+  };
+
+  const loadGrocerySuggestions = async () => {
+    if (!user?.dietaryPreferences || availableIngredients.length === 0) {
+      setGrocerySuggestions([]);
+      return;
+    }
+
+    setIsLoading(true);
+    const remainingCalories = dailySummary?.caloriesRemaining || user.dailyCalorieTarget;
+    const results = await foodService.getMealSuggestionsFromIngredients(
+      availableIngredients,
+      remainingCalories,
+      user.dietaryPreferences
+    );
+    setGrocerySuggestions(results);
     setIsLoading(false);
   };
 
@@ -97,11 +116,21 @@ export function SuggestionsScreen() {
   const remainingCalories = dailySummary?.caloriesRemaining || user?.dailyCalorieTarget || 2000;
 
   const mealTypeConfig = [
-    { type: 'breakfast' as MealType, icon: '🌅', label: 'Breakfast' },
-    { type: 'lunch' as MealType, icon: '☀️', label: 'Lunch' },
-    { type: 'dinner' as MealType, icon: '🌙', label: 'Dinner' },
-    { type: 'snack' as MealType, icon: '🍪', label: 'Snack' },
+    { type: 'breakfast' as MealType, icon: 'weather-sunset-up', label: 'Breakfast' },
+    { type: 'lunch' as MealType, icon: 'weather-sunny', label: 'Lunch' },
+    { type: 'dinner' as MealType, icon: 'weather-night', label: 'Dinner' },
+    { type: 'snack' as MealType, icon: 'cookie', label: 'Snack' },
   ];
+
+  const getMealTypeIcon = (mealType: MealType) => {
+    switch (mealType) {
+      case 'breakfast': return 'weather-sunset-up';
+      case 'lunch': return 'weather-sunny';
+      case 'dinner': return 'weather-night';
+      case 'snack': return 'cookie';
+      default: return 'food';
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -130,26 +159,39 @@ export function SuggestionsScreen() {
             style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
             onPress={() => setActiveTab('meals')}
           >
-            <IconButton
-              icon="food-apple"
-              iconColor={activeTab === 'meals' ? '#667eea' : '#fff'}
-              size={20}
+            <Icon
+              name="food-apple"
+              color={activeTab === 'meals' ? '#667eea' : '#fff'}
+              size={18}
             />
             <Text style={[styles.tabLabel, activeTab === 'meals' && styles.tabLabelActive]}>
-              Meal Ideas
+              Ideas
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'alternatives' && styles.tabActive]}
             onPress={() => setActiveTab('alternatives')}
           >
-            <IconButton
-              icon="swap-horizontal"
-              iconColor={activeTab === 'alternatives' ? '#667eea' : '#fff'}
-              size={20}
+            <Icon
+              name="swap-horizontal"
+              color={activeTab === 'alternatives' ? '#667eea' : '#fff'}
+              size={18}
             />
             <Text style={[styles.tabLabel, activeTab === 'alternatives' && styles.tabLabelActive]}>
-              Healthier Swaps
+              Swaps
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'groceries' && styles.tabActive]}
+            onPress={() => setActiveTab('groceries')}
+          >
+            <Icon
+              name="cart"
+              color={activeTab === 'groceries' ? '#667eea' : '#fff'}
+              size={18}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'groceries' && styles.tabLabelActive]}>
+              Groceries
             </Text>
           </TouchableOpacity>
         </View>
@@ -173,7 +215,12 @@ export function SuggestionsScreen() {
                     selectedMealType === meal.type && styles.mealTypeChipSelected,
                   ]}
                 >
-                  <Text style={styles.mealTypeIcon}>{meal.icon}</Text>
+                  <Icon
+                    name={meal.icon}
+                    size={18}
+                    color={selectedMealType === meal.type ? '#fff' : '#666'}
+                    style={styles.mealTypeIcon}
+                  />
                   <Text style={[
                     styles.mealTypeLabel,
                     selectedMealType === meal.type && styles.mealTypeLabelSelected,
@@ -206,7 +253,7 @@ export function SuggestionsScreen() {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <View style={styles.emptyIconContainer}>
-                    <Text style={styles.emptyIcon}>🍽️</Text>
+                    <Icon name="silverware-fork-knife" size={40} color="#667eea" />
                   </View>
                   <Text style={styles.emptyTitle}>No suggestions available</Text>
                   <Text style={styles.emptySubtext}>
@@ -224,7 +271,7 @@ export function SuggestionsScreen() {
             <Text style={styles.sectionTitle}>Select a meal to find alternatives</Text>
             {todaysMeals.length === 0 ? (
               <View style={styles.noMealsCard}>
-                <Text style={styles.noMealsIcon}>🥗</Text>
+                <Icon name="food-variant" size={40} color="#667eea" style={styles.noMealsIcon} />
                 <Text style={styles.noMealsText}>No meals logged today</Text>
                 <Text style={styles.noMealsSubtext}>
                   Log some meals first to get healthier alternatives
@@ -245,11 +292,13 @@ export function SuggestionsScreen() {
                       selectedMeal?.id === meal.id && styles.mealChipSelected,
                     ]}
                   >
-                    <Text style={styles.mealChipIcon}>
-                      {meal.mealType === 'breakfast' ? '🌅' :
-                       meal.mealType === 'lunch' ? '☀️' :
-                       meal.mealType === 'dinner' ? '🌙' : '🍪'}
-                    </Text>
+                    <View style={styles.mealChipIconContainer}>
+                      <Icon
+                        name={getMealTypeIcon(meal.mealType)}
+                        size={20}
+                        color={selectedMeal?.id === meal.id ? '#667eea' : '#666'}
+                      />
+                    </View>
                     <View style={styles.mealChipContent}>
                       <Text style={[
                         styles.mealChipName,
@@ -291,7 +340,7 @@ export function SuggestionsScreen() {
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                       <View style={styles.emptyIconContainer}>
-                        <Text style={styles.emptyIcon}>✨</Text>
+                        <Icon name="star-circle" size={40} color="#667eea" />
                       </View>
                       <Text style={styles.emptyTitle}>Great choice!</Text>
                       <Text style={styles.emptySubtext}>
@@ -307,12 +356,85 @@ export function SuggestionsScreen() {
           {!selectedMeal && todaysMeals.length > 0 && (
             <View style={styles.selectPrompt}>
               <View style={styles.selectPromptIcon}>
-                <IconButton icon="gesture-tap" iconColor="#667eea" size={32} />
+                <Icon name="gesture-tap" color="#667eea" size={32} />
               </View>
               <Text style={styles.selectPromptText}>
                 Tap on a meal above to see healthier alternatives
               </Text>
             </View>
+          )}
+        </>
+      )}
+
+      {activeTab === 'groceries' && (
+        <>
+          {/* Ingredients Info */}
+          <Surface style={styles.mealsSection} elevation={0}>
+            <Text style={styles.sectionTitle}>
+              {availableIngredients.length > 0
+                ? `Meals you can make with your ${availableIngredients.length} purchased item${availableIngredients.length > 1 ? 's' : ''}`
+                : 'Purchase items from your grocery list to see meal ideas'}
+            </Text>
+            {availableIngredients.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.ingredientChipsScroll}
+              >
+                {availableIngredients.slice(0, 10).map((ingredient, index) => (
+                  <View key={index} style={styles.ingredientChip}>
+                    <Text style={styles.ingredientChipText}>{ingredient}</Text>
+                  </View>
+                ))}
+                {availableIngredients.length > 10 && (
+                  <View style={styles.ingredientChip}>
+                    <Text style={styles.ingredientChipText}>+{availableIngredients.length - 10} more</Text>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </Surface>
+
+          {/* Grocery-based Suggestions */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#667eea" />
+              <Text style={styles.loadingText}>Finding recipes with your ingredients...</Text>
+            </View>
+          ) : availableIngredients.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <Icon name="cart-outline" size={40} color="#667eea" />
+              </View>
+              <Text style={styles.emptyTitle}>No purchased ingredients</Text>
+              <Text style={styles.emptySubtext}>
+                Go to your Grocery list and check off items as you buy them to see meal suggestions here
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={grocerySuggestions}
+              renderItem={({ item }) => (
+                <FoodCard
+                  food={item}
+                  onAdd={() => handleAddFood(item)}
+                  showSuggestionInfo
+                />
+              )}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconContainer}>
+                    <Icon name="magnify" size={40} color="#667eea" />
+                  </View>
+                  <Text style={styles.emptyTitle}>No matches found</Text>
+                  <Text style={styles.emptySubtext}>
+                    Try purchasing different ingredients to see more meal ideas
+                  </Text>
+                </View>
+              }
+            />
           )}
         </>
       )}
@@ -380,17 +502,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 12,
+    gap: 6,
   },
   tabActive: {
     backgroundColor: '#fff',
   },
   tabLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#fff',
-    marginLeft: -4,
   },
   tabLabelActive: {
     color: '#667eea',
@@ -417,7 +540,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#667eea',
   },
   mealTypeIcon: {
-    fontSize: 18,
     marginRight: 8,
   },
   mealTypeLabel: {
@@ -457,9 +579,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  emptyIcon: {
-    fontSize: 40,
-  },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -489,7 +608,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noMealsIcon: {
-    fontSize: 40,
     marginBottom: 12,
   },
   noMealsText: {
@@ -519,8 +637,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#667eea',
   },
-  mealChipIcon: {
-    fontSize: 24,
+  mealChipIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#e8e8e8',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   mealChipContent: {
@@ -575,5 +698,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
     textAlign: 'center',
+  },
+  ingredientChipsScroll: {
+    gap: 8,
+    flexDirection: 'row',
+  },
+  ingredientChip: {
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  ingredientChipText: {
+    fontSize: 13,
+    color: '#2e7d32',
+    fontWeight: '500',
+    textTransform: 'capitalize',
   },
 });

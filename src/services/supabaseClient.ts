@@ -63,6 +63,17 @@ export type Tables = {
     rating: number;
     is_favorite: boolean;
   };
+  grocery_items: {
+    id: string;
+    user_id: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    category: string;
+    purchased: boolean;
+    created_at: string;
+    updated_at: string;
+  };
 };
 
 // Helper functions for database operations
@@ -176,6 +187,69 @@ export const db = {
         { user_id: userId, food_name: foodName, rating, is_favorite: isFavorite },
         { onConflict: 'user_id,food_name' }
       )
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  // Grocery operations
+  async getGroceryItems(userId: string, purchasedOnly?: boolean) {
+    let query = supabase
+      .from('grocery_items')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (purchasedOnly !== undefined) {
+      query = query.eq('purchased', purchasedOnly);
+    }
+
+    const { data, error } = await query;
+    return { data, error };
+  },
+
+  async addGroceryItem(item: Omit<Tables['grocery_items'], 'id' | 'created_at' | 'updated_at'>) {
+    const { data, error } = await supabase
+      .from('grocery_items')
+      .insert({
+        ...item,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async updateGroceryItem(itemId: string, updates: Partial<Tables['grocery_items']>) {
+    const { data, error } = await supabase
+      .from('grocery_items')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', itemId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async deleteGroceryItem(itemId: string) {
+    const { error } = await supabase.from('grocery_items').delete().eq('id', itemId);
+    return { error };
+  },
+
+  async clearPurchasedItems(userId: string) {
+    const { error } = await supabase
+      .from('grocery_items')
+      .delete()
+      .eq('user_id', userId)
+      .eq('purchased', true);
+    return { error };
+  },
+
+  async toggleGroceryItemPurchased(itemId: string, purchased: boolean) {
+    const { data, error } = await supabase
+      .from('grocery_items')
+      .update({ purchased, updated_at: new Date().toISOString() })
+      .eq('id', itemId)
       .select()
       .single();
     return { data, error };

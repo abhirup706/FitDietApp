@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FitDiet",
-    "slug": "FitDietApp",
+    "slug": "fitdiet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,7 +18,8 @@
       "infoPlist": {
         "NSHealthShareUsageDescription": "FitDiet needs access to your health data to track your fitness progress and provide personalized recommendations.",
         "NSHealthUpdateUsageDescription": "FitDiet needs permission to write workout data to Health.",
-        "NSCameraUsageDescription": "FitDiet needs camera access to scan food barcodes."
+        "NSCameraUsageDescription": "FitDiet needs camera access to scan food barcodes.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -34,7 +35,8 @@
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_SLEEP",
-        "android.permission.health.READ_ACTIVE_CALORIES_BURNED"
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -50,8 +52,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "ce2f02b8-92fe-425c-add8-ffa35300254c"
       }
-    }
+    },
+    "owner": "abhirup706"
   }
 }

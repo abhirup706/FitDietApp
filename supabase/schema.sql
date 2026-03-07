@@ -63,6 +63,19 @@ CREATE TABLE IF NOT EXISTS public.food_preferences (
     UNIQUE(user_id, food_name)
 );
 
+-- Grocery items table
+CREATE TABLE IF NOT EXISTS public.grocery_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    quantity DECIMAL(8,2) DEFAULT 1,
+    unit TEXT DEFAULT 'item',
+    category TEXT DEFAULT 'other' CHECK (category IN ('produce', 'dairy', 'meat', 'seafood', 'bakery', 'frozen', 'pantry', 'beverages', 'snacks', 'other')),
+    purchased BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_meals_user_id ON public.meals(user_id);
 CREATE INDEX IF NOT EXISTS idx_meals_logged_at ON public.meals(logged_at);
@@ -71,6 +84,8 @@ CREATE INDEX IF NOT EXISTS idx_fitness_user_id ON public.fitness_data(user_id);
 CREATE INDEX IF NOT EXISTS idx_fitness_date ON public.fitness_data(date);
 CREATE INDEX IF NOT EXISTS idx_fitness_user_date ON public.fitness_data(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_food_prefs_user ON public.food_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_grocery_items_user ON public.grocery_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_grocery_items_purchased ON public.grocery_items(user_id, purchased);
 
 -- Row Level Security (RLS) Policies
 -- Enable RLS on all tables
@@ -78,6 +93,7 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fitness_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.food_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grocery_items ENABLE ROW LEVEL SECURITY;
 
 -- Users: Users can only see and edit their own profile
 CREATE POLICY "Users can view own profile" ON public.users
@@ -128,6 +144,19 @@ CREATE POLICY "Users can update own food preferences" ON public.food_preferences
 CREATE POLICY "Users can delete own food preferences" ON public.food_preferences
     FOR DELETE USING (auth.uid() = user_id);
 
+-- Grocery items: Users can only CRUD their own grocery items
+CREATE POLICY "Users can view own grocery items" ON public.grocery_items
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own grocery items" ON public.grocery_items
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own grocery items" ON public.grocery_items
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own grocery items" ON public.grocery_items
+    FOR DELETE USING (auth.uid() = user_id);
+
 -- Function to automatically create user profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -163,8 +192,15 @@ CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON public.users
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
+-- Trigger for grocery_items table updated_at
+DROP TRIGGER IF EXISTS update_grocery_items_updated_at ON public.grocery_items;
+CREATE TRIGGER update_grocery_items_updated_at
+    BEFORE UPDATE ON public.grocery_items
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
 -- Grant permissions
 GRANT ALL ON public.users TO authenticated;
 GRANT ALL ON public.meals TO authenticated;
 GRANT ALL ON public.fitness_data TO authenticated;
 GRANT ALL ON public.food_preferences TO authenticated;
+GRANT ALL ON public.grocery_items TO authenticated;

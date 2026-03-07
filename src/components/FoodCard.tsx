@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Surface, Text, Button, IconButton } from 'react-native-paper';
+import { Surface, Text, IconButton } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { FoodItem, FoodSuggestion } from '../types';
 
 interface FoodCardProps {
@@ -22,7 +23,7 @@ export function FoodCard({ food, onAdd, showSuggestionInfo = false }: FoodCardPr
             <Image source={{ uri: food.imageUrl }} style={styles.image} />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>🍽️</Text>
+              <Icon name="silverware-fork-knife" size={28} color="#999" />
             </View>
           )}
           <View style={styles.info}>
@@ -127,9 +128,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  imagePlaceholderText: {
-    fontSize: 28,
   },
   info: {
     flex: 1,

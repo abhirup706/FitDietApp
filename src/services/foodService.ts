@@ -1,4 +1,5 @@
 import { FoodItem, NutritionInfo, FoodSuggestion, DietaryPreferences, DietType } from '../types';
+import { spoonacularService } from './spoonacularService';
 
 const OPEN_FOOD_FACTS_API = 'https://world.openfoodfacts.org/api/v2';
 
@@ -117,8 +118,73 @@ class FoodService {
     return Math.max(0, Math.min(100, score));
   }
 
+  // Search for recipes (uses Spoonacular if available)
+  async searchRecipes(
+    query: string,
+    preferences: DietaryPreferences,
+    options: { maxCalories?: number; number?: number } = {}
+  ): Promise<FoodSuggestion[]> {
+    if (spoonacularService.isConfigured()) {
+      try {
+        return await spoonacularService.searchRecipes(query, preferences, options);
+      } catch (error) {
+        console.error('Spoonacular recipe search failed:', error);
+      }
+    }
+
+    // Fallback to Open Food Facts search
+    const foods = await this.searchFoods(query, 1, options.number || 10);
+    return foods.map((food) => ({
+      ...food,
+      reason: this.getSuggestionReason(food, preferences),
+      healthScore: this.calculateHealthScore(food, preferences),
+    }));
+  }
+
   // Get healthier alternatives based on a food item
   async getHealthierAlternatives(
+    originalFood: FoodItem,
+    preferences: DietaryPreferences,
+    limit: number = 5
+  ): Promise<FoodSuggestion[]> {
+    // Try Spoonacular for better recipe alternatives
+    if (spoonacularService.isConfigured()) {
+      try {
+        const searchTerm = originalFood.category || originalFood.name.split(' ')[0];
+        const alternatives = await spoonacularService.searchRecipes(
+          `healthy ${searchTerm}`,
+          preferences,
+          {
+            maxCalories: originalFood.nutrition.calories,
+            number: limit * 2,
+          }
+        );
+
+        // Filter to only healthier options
+        const healthierOptions = alternatives
+          .filter((alt) => alt.healthScore > this.calculateHealthScore(originalFood, preferences))
+          .slice(0, limit);
+
+        if (healthierOptions.length > 0) {
+          return healthierOptions.map((alt) => ({
+            ...alt,
+            caloriesSaved:
+              originalFood.nutrition.calories > alt.nutrition.calories
+                ? originalFood.nutrition.calories - alt.nutrition.calories
+                : undefined,
+          }));
+        }
+      } catch (error) {
+        console.error('Spoonacular alternatives search failed:', error);
+      }
+    }
+
+    // Fallback to Open Food Facts
+    return this.getHealthierAlternativesFallback(originalFood, preferences, limit);
+  }
+
+  // Fallback healthier alternatives using Open Food Facts
+  private async getHealthierAlternativesFallback(
     originalFood: FoodItem,
     preferences: DietaryPreferences,
     limit: number = 5
@@ -175,6 +241,32 @@ class FoodService {
 
   // Get meal suggestions based on remaining calories and preferences
   async getMealSuggestions(
+    remainingCalories: number,
+    preferences: DietaryPreferences,
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  ): Promise<FoodSuggestion[]> {
+    // Try Spoonacular first (better recipe data)
+    if (spoonacularService.isConfigured()) {
+      try {
+        const suggestions = await spoonacularService.getMealSuggestions(
+          mealType,
+          preferences,
+          remainingCalories
+        );
+        if (suggestions.length > 0) {
+          return suggestions;
+        }
+      } catch (error) {
+        console.error('Spoonacular meal suggestions failed:', error);
+      }
+    }
+
+    // Fallback to Open Food Facts
+    return this.getMealSuggestionsFallback(remainingCalories, preferences, mealType);
+  }
+
+  // Fallback meal suggestions using Open Food Facts
+  private async getMealSuggestionsFallback(
     remainingCalories: number,
     preferences: DietaryPreferences,
     mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
@@ -304,6 +396,90 @@ class FoodService {
     return 'Balanced nutrition';
   }
 
+  // Get meal suggestions based on available ingredients
+  async getMealSuggestionsFromIngredients(
+    ingredients: string[],
+    remainingCalories: number,
+    preferences: DietaryPreferences
+  ): Promise<FoodSuggestion[]> {
+    if (ingredients.length === 0) return [];
+
+    // Try Spoonacular first (has dedicated ingredient-based search)
+    if (spoonacularService.isConfigured()) {
+      try {
+        const suggestions = await spoonacularService.findByIngredients(ingredients, {
+          number: 15,
+          ranking: 1, // Maximize used ingredients
+        });
+        if (suggestions.length > 0) {
+          return suggestions;
+        }
+      } catch (error) {
+        console.error('Spoonacular ingredient search failed:', error);
+      }
+    }
+
+    // Fallback to Open Food Facts
+    return this.getMealSuggestionsFromIngredientsFallback(ingredients, remainingCalories, preferences);
+  }
+
+  // Fallback ingredient-based suggestions using Open Food Facts
+  private async getMealSuggestionsFromIngredientsFallback(
+    ingredients: string[],
+    remainingCalories: number,
+    preferences: DietaryPreferences
+  ): Promise<FoodSuggestion[]> {
+    const suggestions: FoodSuggestion[] = [];
+    const seenIds = new Set<string>();
+
+    // Search for meals containing each ingredient
+    for (const ingredient of ingredients.slice(0, 5)) {
+      const foods = await this.searchFoods(ingredient, 1, 15);
+
+      for (const food of foods) {
+        if (seenIds.has(food.id)) continue;
+        seenIds.add(food.id);
+
+        // Skip if too many calories
+        if (food.nutrition.calories > remainingCalories) continue;
+
+        // Check dietary restrictions
+        if (!this.matchesDietaryRestrictions(food, preferences)) continue;
+
+        // Calculate how many available ingredients are in this food
+        const foodNameLower = food.name.toLowerCase();
+        const matchingIngredients = ingredients.filter((ing) =>
+          foodNameLower.includes(ing.toLowerCase())
+        );
+
+        // Base health score
+        let healthScore = this.calculateHealthScore(food, preferences);
+
+        // Boost score for each matching ingredient
+        healthScore += matchingIngredients.length * 10;
+
+        // Generate reason based on matching ingredients
+        let reason = '';
+        if (matchingIngredients.length >= 2) {
+          reason = `Uses ${matchingIngredients.slice(0, 2).join(' & ')}`;
+        } else if (matchingIngredients.length === 1) {
+          reason = `Uses your ${matchingIngredients[0]}`;
+        } else {
+          reason = this.getSuggestionReason(food, preferences);
+        }
+
+        suggestions.push({
+          ...food,
+          reason,
+          healthScore: Math.min(100, healthScore),
+        });
+      }
+    }
+
+    // Sort by health score and return top results
+    return suggestions.sort((a, b) => b.healthScore - a.healthScore).slice(0, 15);
+  }
+
   // Quick add common foods (cached/predefined for better UX)
   getQuickAddFoods(): FoodItem[] {
     return [
@@ -368,3 +544,6 @@ class FoodService {
 }
 
 export const foodService = new FoodService();
+
+// Re-export spoonacular service for direct access if needed
+export { spoonacularService } from './spoonacularService';

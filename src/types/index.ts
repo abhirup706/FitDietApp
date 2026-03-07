@@ -4,6 +4,7 @@ export type Goal = 'lose' | 'maintain' | 'gain';
 export type DietType = 'balanced' | 'weight_loss' | 'muscle_gain' | 'vegetarian' | 'vegan' | 'keto' | 'low_carb' | 'custom';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type HealthSource = 'apple_watch' | 'fitbit' | 'google_fit' | 'manual';
+export type GroceryCategory = 'produce' | 'dairy' | 'meat' | 'seafood' | 'bakery' | 'frozen' | 'pantry' | 'beverages' | 'snacks' | 'other';
 
 export interface DietaryPreferences {
   dietType: DietType;
@@ -67,6 +68,20 @@ export interface FoodPreference {
   isFavorite: boolean;
 }
 
+export interface GroceryItem {
+  id: string;
+  userId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  category: GroceryCategory;
+  purchased: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NewGroceryItem = Omit<GroceryItem, 'id' | 'userId' | 'createdAt' | 'updatedAt'>;
+
 // Food API types
 export interface NutritionInfo {
   calories: number;
@@ -129,6 +144,7 @@ export type MainTabParamList = {
   Home: undefined;
   DietLog: undefined;
   Fitness: undefined;
+  Grocery: undefined;
   Suggestions: undefined;
   Profile: undefined;
 };
